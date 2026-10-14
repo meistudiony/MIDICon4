@@ -40,3 +40,7 @@ is available; setup UI and persistence are pending. See [calibration](docs/calib
 
 See [hardware notes](docs/hardware.md) and [architecture/roadmap](docs/architecture.md).
 GitHub remote can be added once the repository exists. No credentials belong here.
+
+The agreed [setup and recovery flow](docs/setup.md) includes hardware/browser factory
+reset and network-only reset. Shared reset logic is scaffolded; NVS and UI adapters
+remain pending.

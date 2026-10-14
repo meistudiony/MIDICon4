@@ -16,8 +16,9 @@ struct EncoderConfig {
   EncoderMode mode = EncoderMode::Absolute;
   bool acceleration = false;
 };
+enum class NetworkMode : uint8_t { Standalone, Lan };
 struct Configuration {
-  uint16_t version = 1;
+  uint16_t version = 2;
   ControlConfig faders[3] = {
     {"FADER 1", 1, 21, 0, 127, false},
     {"FADER 2", 1, 22, 0, 127, false},
@@ -26,6 +27,9 @@ struct Configuration {
   EncoderConfig encoder;
   char deviceName[33] = "MIDI Controller";
   char hostname[33] = "midi-control";
+  NetworkMode networkMode = NetworkMode::Standalone;
+  bool networkSetupComplete = false;
+  uint8_t screenBrightness = 128; // Driver contrast 0..255; UI scale comes later.
   char wifiSsid[33] = "";
   char wifiPassword[65] = "";
 };

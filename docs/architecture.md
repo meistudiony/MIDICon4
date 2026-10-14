@@ -32,4 +32,6 @@ Bring-up milestones: (1) build/upload/serial, (2) ADC measurements and tune filt
 The modular skeleton does not depend on sequentially wiring every milestone.
 Record real hardware measurements before tuning filters or fixing calibration.
 
-User calibration is a setup requirement; see [workflow and implementation](calibration.md).
+User calibration is an optional setup feature; see [workflow and implementation](calibration.md).
+
+See [setup experience and recovery](setup.md) for onboarding, persistence and reset contracts.
