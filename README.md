@@ -15,17 +15,27 @@ Install Arduino CLI and the Espressif Arduino board package:
 
 ```sh
 arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
-arduino-cli core install esp32:esp32 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
 sh scripts/compile.sh
 arduino-cli board list
-arduino-cli upload -p /dev/cu.YOUR_PORT --fqbn 'esp32:esp32:XIAO_ESP32S3:USBMode=default,CDCOnBoot=cdc' firmware/MIDICont
+arduino-cli upload -p /dev/cu.YOUR_PORT --fqbn 'esp32:esp32:XIAO_ESP32S3:USBMode=default,CDCOnBoot=default' firmware/MIDICont
 arduino-cli monitor -p /dev/cu.YOUR_PORT --config baudrate=115200
 ```
 
-After the first successful build, record the installed core version here before
-relying on reproducible builds. USB OTG/TinyUSB mode is intentional for eventual
+Toolchain: Arduino CLI 1.5.1 and Espressif Arduino core 3.3.12.
+The installation command pins the core version for consistent builds.
+USB OTG/TinyUSB mode is intentional for eventual
 MIDI support; this stage exposes CDC serial only. If upload recovery is needed,
 hold BOOT while connecting USB, then release it and select the new port.
+
+If building on an external drive is slow, use a local temporary build directory:
+
+```sh
+MIDICONT_BUILD_DIR=/tmp/midicont-esp32-build sh scripts/compile.sh
+```
+
+The scaffold compiles successfully with the toolchain above; upload and USB
+enumeration still require a connected board.
 
 Confirm heartbeat first. To enable a wired fader, edit `FaderPins` in
 `firmware/MIDICont/src/hardware/HardwareConfig.h` to its confirmed GPIO number.
