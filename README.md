@@ -35,7 +35,8 @@ CSV diagnostics report raw ADC, filtered ADC, 16-bit normalized value and
 prospective CC value at 10 Hz per enabled fader. Sampling runs at 200 Hz with
 an initial 1/8 exponential filter. MIDI quantization includes a hysteresis margin;
 serial telemetry intentionally includes unchanged values to measure noise.
-Calibration currently uses RAM defaults (0..4095); use measured endpoints later.
+Calibration currently uses RAM defaults (0..4095). A user calibration session core
+is available; setup UI and persistence are pending. See [calibration](docs/calibration.md).
 
 See [hardware notes](docs/hardware.md) and [architecture/roadmap](docs/architecture.md).
 GitHub remote can be added once the repository exists. No credentials belong here.
