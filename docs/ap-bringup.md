@@ -10,7 +10,7 @@ that preview closes its simulated session; use serial `x` to actually stop Wi-Fi
 
 1. Compile/upload using `scripts/compile.sh` (it embeds the current `web/` assets).
 2. Open the board's current USB serial port at 115200 baud.
-3. Type `w` to start Wi-Fi setup. Read the SSID, session password and URL printed
+3. Type `w` to start Wi-Fi setup. Read the SSID, setup password (`midisetup`) and URL printed
    on USB serial. `s` prints them again. `x` stops the server and turns Wi-Fi off.
 4. On the phone, join that SSID using the printed password. Remain connected if
    the phone reports no internet. No internet access is provided by this AP.
@@ -20,7 +20,7 @@ that preview closes its simulated session; use serial `x` to actually stop Wi-Fi
    calibration simulation, brightness and confirmation dialogs on the phone.
 
 Wi-Fi stays off after boot until `w` is received. Reboot or `x` stops the AP.
-The next AP session generates a new password. Temporary USB serial control will
+The setup password stays `midisetup` across AP sessions. Temporary USB serial control will
 later be replaced/supplemented by the local encoder/menu flow.
 
 ## Verification

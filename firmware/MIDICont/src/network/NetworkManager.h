@@ -1,7 +1,6 @@
 #pragma once
 #include <Arduino.h>
 #include <WiFi.h>
-#include <esp_system.h>
 #include <esp_mac.h>
 #include "../web/WebConfigServer.h"
 namespace midi_cont {
@@ -15,9 +14,8 @@ class NetworkManager {
     uint8_t mac[6] = {};
     if (esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP) != ESP_OK) return fail();
     snprintf(ssid_, sizeof(ssid_), "MIDICon4-%02X%02X%02X", mac[3], mac[4], mac[5]);
-    // Random per session, not a shared password committed in the repository.
-    snprintf(password_, sizeof(password_), "%08lx%08lx",
-             static_cast<unsigned long>(esp_random()), static_cast<unsigned long>(esp_random()));
+    // Readable setup password, kept consistent across AP sessions.
+    strcpy(password_, "midisetup");
     const IPAddress address(192, 168, 4, 1), mask(255, 255, 255, 0);
     if (!WiFi.softAPConfig(address, address, mask) || !WiFi.softAP(ssid_, password_)) return fail();
     web_.begin(); active_ = true; clients_ = 0;
