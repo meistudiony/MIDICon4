@@ -1,3 +1,4 @@
+export const copyConfiguration = value => JSON.parse(JSON.stringify(value));
 export const SCHEMA_VERSION = 2;
 export function defaults() {
   return {
@@ -34,5 +35,5 @@ export function validate(config) {
 export function resetConfiguration(current, scope) {
   if (scope === 'factory') return defaults();
   if (scope !== 'network') throw new Error('Unknown reset type.');
-  return {...structuredClone(current), networkMode: 'standalone', networkSetupComplete: false, wifiSsid: ''};
+  return {...copyConfiguration(current), networkMode: 'standalone', networkSetupComplete: false, wifiSsid: ''};
 }

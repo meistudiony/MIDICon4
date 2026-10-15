@@ -15,8 +15,8 @@ features already work:
 | ConfigManager | Versioned load/save/migration/factory reset; Preferences |
 | DisplayManager | Single-channel PCA9546 selection and rotated OLED rendering; Wire + proposed U8g2 |
 | MidiManager | Changed-value transmission and replaceable transport; investigate core USBMIDI first |
-| NetworkManager | Off during normal mode; bounded LAN attempt, AP fallback, mDNS; WiFi + ESPmDNS |
-| WebConfigServer | Validated configuration edits; core WebServer initially |
+| NetworkManager | Serial-triggered AP implemented; LAN attempt/fallback and mDNS pending |
+| WebConfigServer | Core WebServer serves embedded preview; configuration API pending |
 
 Only core Arduino/ESP32 APIs are used now; no third-party dependencies installed.
 U8g2 is proposed for software 90-degree rotation, pending module verification.

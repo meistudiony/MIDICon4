@@ -1,7 +1,7 @@
 # MIDICon4 setup interface
 
 A buildless, responsive interface intended to be served by the ESP32. The current
-adapter is a clearly labeled browser preview: no firmware upload, radio change,
+adapter is a clearly labeled browser preview: no firmware upload, radio change from the UI,
 MIDI output or NVS write happens from these pages. Everything runs locally;
 there are no CDN, external font, analytics or internet dependencies.
 
@@ -14,7 +14,7 @@ python3 -m http.server 8080 --bind 127.0.0.1 --directory web
 ```
 
 Open http://127.0.0.1:8080 in a browser. This binds to your own computer only.
-The controller does not host this version yet. Stop with Ctrl-C.
+For hosting this same preview on the XIAO, see [AP bring-up](../docs/ap-bringup.md). Stop with Ctrl-C.
 
 On first visit, choose standalone or simulate joining Wi-Fi, then go directly to
 the main menu. Calibration is optional. Settings are saved in this browser's local

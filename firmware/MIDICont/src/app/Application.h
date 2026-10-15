@@ -4,12 +4,13 @@
 #include "../hardware/HardwareConfig.h"
 #include "../controls/FaderInput.h"
 #include "../midi/MidiManager.h"
+#include "../network/NetworkManager.h"
 namespace midi_cont {
 class Application {
  public:
   void begin() {
     Serial.begin(115200);
-    WiFi.mode(WIFI_OFF);
+    network_.begin();
     analogReadResolution(hardware::AdcBits);
     for (int pin : hardware::FaderPins) {
       if (pin != hardware::Unassigned) {
@@ -19,9 +20,18 @@ class Application {
     }
   }
   void tick() {
+    // Serial commands stand in for the encoder until it is wired.
+    for (unsigned i = 0; i < 16 && Serial.available(); ++i) {
+      const char command = Serial.read();
+      if (command == 'w') network_.startSetup();
+      else if (command == 'x') network_.stopSetup();
+      else if (command == 's') network_.printStatus();
+    }
+    network_.tick();
     const uint32_t now = millis();
     if (!announced_ && Serial) {
-      Serial.println("MIDICont bring-up: USB serial only; Wi-Fi off; unassigned inputs skipped.");
+      Serial.println("MIDICont bring-up: Wi-Fi off at boot; unassigned inputs skipped.");
+      Serial.println("Commands: w=start AP setup, x=stop setup, s=network status");
       Serial.println("fader,raw,filtered,normalized,cc_value");
       announced_ = true;
     }
@@ -44,6 +54,7 @@ class Application {
     }
   }
  private:
+  NetworkManager network_;
   Configuration config_ = factoryDefaults();
   FaderInput faders_[3];
   MidiValueTracker values_[3];

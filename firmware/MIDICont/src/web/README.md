@@ -1,2 +1,2 @@
-Browser setup assets and a simulated device adapter are implemented in web/.
-WebConfigServer on the ESP32 is pending; see docs/web-api.md.
+WebConfigServer serves embedded browser preview assets during AP bring-up.
+Device-side configuration handlers remain pending; see docs/ap-bringup.md and docs/web-api.md.

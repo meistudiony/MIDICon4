@@ -1,7 +1,8 @@
 import {PreviewDevice} from './device.mjs';
+import {copyConfiguration} from './model.mjs';
 const app = document.querySelector('#app');
 const device = new PreviewDevice({getItem: key => localStorage.getItem(key), setItem: (key, value) => localStorage.setItem(key, value)});
-const clone = value => structuredClone(value);
+const clone = copyConfiguration;
 const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let config, draft, page = 'network', networkMode = 'standalone', selectedControl = 0;
 let selectedFader = 0, calibration = null, finished = false, busy = false, toastTimer;

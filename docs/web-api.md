@@ -1,8 +1,8 @@
 # Setup firmware integration contract (planned)
 
-The first interface is in `web/`, with a browser-only preview adapter. Firmware
-still runs serial bring-up. None of the routes below are implemented or exposed.
-No extra network services are started by the existing firmware.
+The first interface is in `web/`, with a browser-only preview adapter. Firmware can now serve these assets from a serial-triggered AP; see
+[AP bring-up](ap-bringup.md). The configuration operations below are not implemented.
+The read-only `/api/status` endpoint reports actual AP state. Wi-Fi stays off at boot.
 
 The embedded implementation should serve these same local assets and replace
 PreviewDevice with an HTTP adapter. It must explicitly identify the live device

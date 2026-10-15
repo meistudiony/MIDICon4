@@ -5,8 +5,9 @@ three faders, one encoder, four OLEDs, and optional browser configuration.
 
 ## Current scope
 
-Phase 1 USB serial heartbeat and Phase 2 ADC diagnostics only. No MIDI USB
-interface, displays, encoder decoding, persistence, or web server yet.
+Phase 1 USB serial heartbeat, Phase 2 ADC diagnostics, and an optional
+serial-triggered AP/web preview. No MIDI USB interface, displays, encoder decoding,
+persistent device configuration, or LAN provisioning yet.
 All pins start unassigned; booting the skeleton does not read floating inputs.
 
 ## Build and bring-up
@@ -64,6 +65,9 @@ python3 -m http.server 8080 --bind 127.0.0.1 --directory web
 ```
 
 Open http://127.0.0.1:8080. This is a browser-only simulation, with settings saved
-in that browser; the XIAO still runs bring-up firmware. Network onboarding, the
+in that browser; the XIAO serves the same preview when AP setup is started over serial. Network onboarding, the
 main menu, CC editing, optional calibration, brightness and reset confirmations
 are interactive. See the [firmware integration contract](docs/web-api.md).
+
+See [phone AP bring-up](docs/ap-bringup.md): serial `w` starts setup, `s` prints
+connection details, and `x` stops setup. Wi-Fi remains off by default.

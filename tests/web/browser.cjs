@@ -4,6 +4,8 @@ const assert = require('node:assert/strict');
  const browser = await chromium.launch({executablePath:process.env.MIDICONT_BROWSER_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});
  const context = await browser.newContext({viewport:{width:1440,height:1050}});
  const page = await context.newPage();
+ // Device pages use plain HTTP, where secure-context helpers may be absent.
+ await page.addInitScript(() => { window.structuredClone = undefined; });
  const errors = []; page.on('pageerror',e => errors.push(e.message));
  try {
   await page.goto(process.env.MIDICONT_PREVIEW_URL || 'http://127.0.0.1:8080');
