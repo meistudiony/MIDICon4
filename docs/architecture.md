@@ -35,3 +35,6 @@ Record real hardware measurements before tuning filters or fixing calibration.
 User calibration is an optional setup feature; see [workflow and implementation](calibration.md).
 
 See [setup experience and recovery](setup.md) for onboarding, persistence and reset contracts.
+
+The browser preview is implemented in [web/](../web/README.md); its simulated
+adapter is separate from the planned [device API](web-api.md).

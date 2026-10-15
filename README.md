@@ -54,3 +54,16 @@ GitHub remote can be added once the repository exists. No credentials belong her
 The agreed [setup and recovery flow](docs/setup.md) includes hardware/browser factory
 reset and network-only reset. Shared reset logic is scaffolded; NVS and UI adapters
 remain pending.
+
+## Browser setup preview
+
+The first responsive setup interface is in [web/](web/README.md). Run:
+
+```sh
+python3 -m http.server 8080 --bind 127.0.0.1 --directory web
+```
+
+Open http://127.0.0.1:8080. This is a browser-only simulation, with settings saved
+in that browser; the XIAO still runs bring-up firmware. Network onboarding, the
+main menu, CC editing, optional calibration, brightness and reset confirmations
+are interactive. See the [firmware integration contract](docs/web-api.md).
