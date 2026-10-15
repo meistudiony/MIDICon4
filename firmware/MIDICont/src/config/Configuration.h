@@ -2,7 +2,7 @@
 #include <stdint.h>
 namespace midi_cont {
 struct ControlConfig {
-  char label[17];
+  char label[17]; // Fixed control name; not exposed as a user setting.
   uint8_t channel = 1; // User-facing channels 1..16.
   uint8_t cc = 21;
   uint8_t minimum = 0;
@@ -12,7 +12,7 @@ struct ControlConfig {
 struct Calibration { uint16_t minimum = 0; uint16_t maximum = 4095; };
 enum class EncoderMode : uint8_t { Absolute, Relative, Wrap };
 struct EncoderConfig {
-  ControlConfig control{"ENCODER", 1, 24, 0, 127, false};
+  ControlConfig control{"Encoder", 1, 24, 0, 127, false};
   EncoderMode mode = EncoderMode::Absolute;
   bool acceleration = false;
 };
@@ -20,12 +20,12 @@ enum class NetworkMode : uint8_t { Standalone, Lan };
 struct Configuration {
   uint16_t version = 2;
   ControlConfig faders[3] = {
-    {"FADER 1", 1, 21, 0, 127, false},
-    {"FADER 2", 1, 22, 0, 127, false},
-    {"FADER 3", 1, 23, 0, 127, false}};
+    {"Fader 1", 1, 21, 0, 127, false},
+    {"Fader 2", 1, 22, 0, 127, false},
+    {"Fader 3", 1, 23, 0, 127, false}};
   Calibration calibration[3];
   EncoderConfig encoder;
-  char deviceName[33] = "MIDI Controller";
+  // Device name/serial belong to hardware/DeviceIdentity.h, not user settings.
   char hostname[33] = "midi-control";
   NetworkMode networkMode = NetworkMode::Standalone;
   bool networkSetupComplete = false;

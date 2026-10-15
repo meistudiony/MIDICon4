@@ -44,3 +44,28 @@ test('invalid saved schema loads defaults with explicit warning', async () => {
   const device = new PreviewDevice(storage);
   assert.deepEqual(await device.load(), defaults()); assert.match(device.warning, /could not be read/);
 });
+
+test('legacy names become fixed without losing fader or encoder assignments', async () => {
+  const storage = memory();
+  const config = defaults();
+  config.faders[0].label = 'VOCAL';
+  config.faders[0].cc = 70;
+  config.calibration[0] = {
+    minimum: 100,
+    maximum: 3700,
+    calibrated: true
+  };
+  config.encoder.label = 'CUSTOM';
+  config.encoder.cc = 25;
+  storage.data = JSON.stringify(config);
+
+  const loaded = await new PreviewDevice(storage).load();
+
+  assert.deepEqual(
+    [...loaded.faders, loaded.encoder].map(control => control.label),
+    ['Fader 1', 'Fader 2', 'Fader 3', 'Encoder']
+  );
+  assert.equal(loaded.faders[0].cc, 70);
+  assert.equal(loaded.encoder.cc, 25);
+  assert.deepEqual(loaded.calibration[0], config.calibration[0]);
+});

@@ -1,8 +1,10 @@
 # Setup firmware integration contract (planned)
 
 The first interface is in `web/`, with a browser-only preview adapter. Firmware can now serve these assets from a serial-triggered AP; see
-[AP bring-up](ap-bringup.md). The configuration operations below are not implemented.
-The read-only `/api/status` endpoint reports actual AP state. Wi-Fi stays off at boot.
+[AP bring-up](ap-bringup.md). Network connection/settings are implemented; the remaining configuration operations below are pending.
+The read-only `/api/status` endpoint reports actual AP state.
+`POST /api/networks/scan` and `GET /api/networks` now provide real asynchronous
+network discovery; see [AP bring-up](ap-bringup.md). A valid saved network configuration starts setup automatically at boot.
 
 The embedded implementation should serve these same local assets and replace
 PreviewDevice with an HTTP adapter. It must explicitly identify the live device
@@ -31,3 +33,5 @@ OLED driver may need a contrast mapping. Encoder mode choices stay limited to
 implemented bounded absolute mode; reserve relative/wrap/acceleration for later.
 An eventual browser API must use firmware-reported capabilities rather than imply
 an unfinished control feature works.
+
+Real network endpoints and persistence behavior are documented in [AP bring-up](ap-bringup.md).

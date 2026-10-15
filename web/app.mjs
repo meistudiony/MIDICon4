@@ -1,11 +1,13 @@
-import {PreviewDevice} from './device.mjs';
-import {copyConfiguration} from './model.mjs';
+import {SetupDevice, scanNearbyNetworks} from './device.mjs';
+import {copyConfiguration, CONTROL_NAMES} from './model.mjs';
 const app = document.querySelector('#app');
-const device = new PreviewDevice({getItem: key => localStorage.getItem(key), setItem: (key, value) => localStorage.setItem(key, value)});
+const device = new SetupDevice({getItem: key => localStorage.getItem(key), setItem: (key, value) => localStorage.setItem(key, value)});
 const clone = copyConfiguration;
 const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let config, draft, page = 'network', networkMode = 'standalone', selectedControl = 0;
 let selectedFader = 0, calibration = null, finished = false, busy = false, toastTimer;
+let networkHandoff = null;
+let networkScan = {state:'idle', networks:[], error:''};
 const dialog = document.querySelector('#confirm-dialog');
 function confirmAction(title, description, label = 'Continue', destructive = false) {
   return new Promise(resolve => {
@@ -35,26 +37,221 @@ async function navigate(next) {
   page = next; render();
 }
 function heading(kicker, title, description, back = true) {
-  return `${back && config.networkSetupComplete ? '<button class="back quiet" data-route="home">← Main menu</button>' : ''}<div class="page-heading"><div><div class="eyebrow">${kicker}</div><h1 tabindex="-1">${title}</h1><p class="intro">${description}</p></div></div>`;
-}
-function formActions(label = 'Save changes') {
-  return `<div class="actions"><span class="saved-note">Saved in this browser · preview only</span><button type="button" data-action="cancel">Cancel</button><button class="primary" type="submit">${label}</button></div>`;
-}
-function networkPage() {
-  const initial = !config.networkSetupComplete;
-  return `${heading(initial ? 'WELCOME / FIRST CONNECTION' : '01 / NETWORK SETUP', initial ? 'Make yourself connected.' : 'Your connection. Your choice.', 'Connect directly to your controller, or configure it from a device on your studio Wi-Fi.', !initial)}
-    <form id="network-form">
-      <div class="network-choices" role="group" aria-label="Connection mode">
-        <button type="button" class="choice ${networkMode === 'standalone' ? 'selected' : ''}" data-network="standalone" aria-pressed="${networkMode === 'standalone'}"><span class="check" aria-hidden="true">${networkMode === 'standalone' ? '✓' : ''}</span><span class="icon" aria-hidden="true">⌁</span><h2>Use standalone</h2><p>Connect straight to the controller’s own Wi-Fi. No router or internet needed.</p></button>
-        <button type="button" class="choice ${networkMode === 'lan' ? 'selected' : ''}" data-network="lan" aria-pressed="${networkMode === 'lan'}"><span class="check" aria-hidden="true">${networkMode === 'lan' ? '✓' : ''}</span><span class="icon" aria-hidden="true">↗</span><h2>Join my Wi-Fi</h2><p>Keep your phone or computer on your usual network while you configure.</p></button>
+  return `
+    ${back && config.networkSetupComplete ? `
+      <button class="back quiet" data-route="home">
+        ← Main menu
+      </button>
+    ` : ''}
+
+    <div class="page-heading">
+      <div>
+        ${kicker ? `<div class="eyebrow">${kicker}</div>` : ''}
+        <h1 tabindex="-1">${title}</h1>
+        ${description ? `<p class="intro">${description}</p>` : ''}
       </div>
-      <section class="panel" aria-label="Network details">
-      ${networkMode === 'lan' ? `<h3>Connect to your studio network</h3><p>Use a 2.4 GHz network. The controller will keep direct access available if it can’t connect.</p><div class="fields"><label>Wi-Fi network name<input name="ssid" maxlength="32" value="${esc(draft.wifiSsid)}" placeholder="Your network name" autocomplete="off" required></label><label>Wi-Fi password<input name="password" type="password" maxlength="63" placeholder="Not stored or tested in preview" autocomplete="new-password"></label></div><p class="note"><strong>Preview:</strong> no network connection will be attempted, and the password will not be saved. On the controller, connection must succeed before LAN setup is completed.</p>` : '<h3>A direct connection, whenever you need it.</h3><p>During Wi-Fi setup, connect to the network shown on the controller’s screen, then open its setup address.</p><span class="tag">DEVICE ADDRESS · 192.168.4.1</span>'}
+    </div>
+  `;
+}
+
+function formActions(label = 'Save changes') {
+  const saveLocation = page === 'network' && device.networkLive
+    ? 'Network settings saved on the controller'
+    : 'Saved in this browser · preview only';
+
+  return `
+    <div class="actions">
+      <span class="saved-note">${saveLocation}</span>
+      <button type="button" data-action="cancel">Cancel</button>
+      <button class="primary" type="submit">${label}</button>
+    </div>
+  `;
+}
+
+function networkConnectionStatus() {
+  if (!device.networkLive) {
+    return '';
+  }
+
+  const status = device.networkStatus;
+  if (status.state === 'connected') {
+    const hostname = status.activeHostname || config.hostname;
+    return `
+      <p class="help">
+        Connected to ${esc(config.wifiSsid)}.
+        Address:
+        <a href="http://${esc(status.ip)}/">${esc(status.ip)}</a>
+        ${status.mdns ? `
+          · <a href="http://${esc(hostname)}.local/">
+            ${esc(hostname)}.local
+          </a>
+        ` : ''}
+      </p>
+    `;
+  }
+
+  const message = status.state === 'failed'
+    ? status.error
+    : status.state === 'connecting'
+      ? 'Connecting to saved Wi-Fi… Direct setup access remains available.'
+      : 'Standalone setup access is available.';
+
+  return `<p class="help">${esc(message)}</p>`;
+}
+
+function networkPage() {
+  if (networkHandoff) {
+    const hostname = networkHandoff.activeHostname || config.hostname;
+    return `
+      ${heading('NETWORK SETUP', 'Connected to Wi-Fi', '', false)}
+      <section class="panel">
+        <p>
+          Reconnect your phone or computer to ${esc(config.wifiSsid)}.
+          The controller’s setup Wi-Fi will turn off.
+        </p>
+        <p>
+          Open <a href="http://${esc(networkHandoff.ip)}/">
+            http://${esc(networkHandoff.ip)}/
+          </a>
+          ${networkHandoff.mdns ? `
+            or <a href="http://${esc(hostname)}.local/">
+              http://${esc(hostname)}.local/
+            </a>
+          ` : ''}
+          to continue setup.
+        </p>
       </section>
-      <div class="fields"><label>Device name<input name="deviceName" maxlength="32" required value="${esc(draft.deviceName)}"></label><label>Local hostname<input name="hostname" pattern="[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?" maxlength="32" required value="${esc(draft.hostname)}" aria-describedby="hostname-help"><small id="hostname-help">${networkMode === 'lan' ? 'Open this name with .local when connected to your LAN.' : 'Used if you choose LAN mode later.'}</small></label></div>
-      <div class="note">Wi-Fi is only on during Wi-Fi setup. Finish setup to return to normal USB MIDI operation.</div>
-      <div id="form-error" role="alert"></div>${formActions(initial ? (networkMode === 'lan' ? 'Simulate connection & continue →' : 'Save & continue →') : 'Save network settings')}
-    </form>`;
+    `;
+  }
+
+  const initial = !config.networkSetupComplete;
+  const usingWifi = networkMode === 'lan';
+  const passwordPlaceholder = device.networkStatus?.settings.hasPassword
+    ? 'Leave blank to keep saved password'
+    : 'Wi-Fi password (blank for open networks)';
+
+  return `
+    ${heading(
+      initial ? 'WELCOME' : 'NETWORK SETUP',
+      'How would you like to connect?',
+      '',
+      !initial
+    )}
+
+    <form id="network-form">
+      <div
+        class="network-choices"
+        role="group"
+        aria-label="Connection mode"
+      >
+        <button
+          type="button"
+          class="choice ${!usingWifi ? 'selected' : ''}"
+          data-network="standalone"
+          aria-pressed="${!usingWifi}"
+        >
+          <span class="check" aria-hidden="true">
+            ${!usingWifi ? '✓' : ''}
+          </span>
+          <span class="icon" aria-hidden="true">⌁</span>
+          <h2>Standalone</h2>
+          <p>
+            Connect straight to the controller’s own Wi-Fi.
+            No router or internet needed.
+          </p>
+        </button>
+
+        <button
+          type="button"
+          class="choice ${usingWifi ? 'selected' : ''}"
+          data-network="lan"
+          aria-pressed="${usingWifi}"
+        >
+          <span class="check" aria-hidden="true">
+            ${usingWifi ? '✓' : ''}
+          </span>
+          <span class="icon" aria-hidden="true">↗</span>
+          <h2>Wi-Fi</h2>
+          <p>
+            Keep your phone or computer on your usual network
+            while you configure.
+          </p>
+        </button>
+      </div>
+
+      <section class="panel" aria-label="Network details">
+        ${networkConnectionStatus()}
+
+        ${usingWifi ? `
+          <h3>Connect to your Wi-Fi network</h3>
+          <p>
+            Use a 2.4 GHz network. Direct setup access stays available
+            if the connection fails.
+          </p>
+
+          <div class="fields">
+            <div>
+              <label for="network-list">Wi-Fi network</label>
+              <select
+                id="network-list"
+                name="ssid"
+                required
+                aria-describedby="scan-status"
+              >
+                <option value="">Select a network</option>
+              </select>
+              <button
+                type="button"
+                data-action="refresh-networks"
+                class="network-refresh"
+              >
+                Refresh
+              </button>
+              <p
+                id="scan-status"
+                role="status"
+                aria-live="polite"
+                class="help network-scan-status"
+              ></p>
+            </div>
+
+            <label>
+              Wi-Fi password
+              <input
+                name="password"
+                type="password"
+                maxlength="63"
+                placeholder="${passwordPlaceholder}"
+                autocomplete="new-password"
+              >
+            </label>
+          </div>
+
+          <p class="note">
+            ${device.networkLive
+              ? 'Stay on the setup Wi-Fi until the connection result appears.'
+              : 'Open this page on the controller to connect.'}
+          </p>
+        ` : `
+          <h3>Standalone connection</h3>
+          <p>
+            Connect directly to the controller whenever you need
+            to change its settings.
+          </p>
+        `}
+
+        <div id="form-error" role="alert"></div>
+        <p
+          id="connection-status"
+          role="status"
+          aria-live="polite"
+          class="help"
+        ></p>
+
+        ${formActions(usingWifi ? 'Connect & save' : 'Save standalone')}
+      </section>
+    </form>
+  `;
 }
 function homePage() {
   const cards = [
@@ -63,28 +260,156 @@ function homePage() {
     ['controls', '03', 'CC Configuration', 'Set the assignment behind every movement.'],
     ['options', '04', 'Options', 'Screen brightness and recovery settings.']
   ];
-  return `${heading('YOUR CONTROLLER / SETUP', 'A place for everything.', 'Fine-tune your controller, save your settings, then get back to making music.', false)}
-    <div class="device-summary"><div><span class="metric-label">DEVICE</span><span class="metric-value">${esc(config.deviceName)}</span></div><div><span class="metric-label">SAVED CONNECTION</span><span class="metric-value">${config.networkMode === 'lan' ? esc(config.wifiSsid) : 'Standalone access point'}</span></div><div><span class="metric-label">PREVIEW SESSION</span><span class="metric-value accent">Ready to configure</span></div></div>
-    <div class="menu-grid">${cards.map(([route, number, title, description]) => `<button class="menu-card" data-route="${route}"><span class="card-top"><span>${number} / SETUP</span><span aria-hidden="true">↗</span></span><h2>${title}</h2><p>${description}</p></button>`).join('')}</div>
-    <div class="menu-bottom"><p>Settings are saved individually on each page.</p><button class="primary" data-action="finish">Finish setup →</button></div>`;
+  const menuName = config.deviceName.replace(/^MIDICon4-/, 'MIDICon-');
+
+  return `
+    ${heading('', `Configure ${esc(menuName)}`, '', false)}
+
+    <div class="menu-grid">
+      ${cards.map(([route, number, title, description]) => `
+        <button class="menu-card" data-route="${route}">
+          <span class="card-top">
+            <span>${number} / SETUP</span>
+            <span aria-hidden="true">↗</span>
+          </span>
+          <h2>${title}</h2>
+          <p>${description}</p>
+        </button>
+      `).join('')}
+    </div>
+
+    <div class="menu-bottom">
+      <p>Settings are saved individually on each page.</p>
+      <button class="primary" data-action="finish">
+        Finish setup →
+      </button>
+    </div>
+  `;
 }
+
 function controlPage() {
   const encoder = selectedControl === 3;
   const control = encoder ? draft.encoder : draft.faders[selectedControl];
-  return `${heading('03 / CC CONFIGURATION', 'Every move, assigned.', 'Set each control’s MIDI channel, CC number and output range. Save all four assignments together.')}
-    <div class="control-tabs" role="tablist" aria-label="Control">${['Fader 1', 'Fader 2', 'Fader 3', 'Encoder'].map((label,i) => `<button id="tab-${i}" role="tab" tabindex="${selectedControl === i ? 0 : -1}" aria-selected="${selectedControl === i}" aria-controls="control-panel" data-control="${i}">${label}</button>`).join('')}</div>
-    <form id="controls-form"><section class="panel" id="control-panel" role="tabpanel" aria-labelledby="tab-${selectedControl}"><div class="control-head"><h2>${encoder ? 'Rotary encoder' : `Fader ${selectedControl + 1}`}</h2><span class="tag">MIDI 1.0 / CONTROL CHANGE</span></div>
-      <div class="fields assignment-fields"><label>Control label<input data-control-field="label" maxlength="16" required value="${esc(control.label)}"></label><label>MIDI channel<input data-control-field="channel" type="number" min="1" max="16" required value="${control.channel}"></label><label>CC number<input data-control-field="cc" type="number" min="0" max="127" required value="${control.cc}"></label></div>
-      <div class="subheading">OUTPUT RANGE</div><div class="fields range-fields"><label>Minimum<input data-control-field="minimum" type="number" min="0" max="127" required value="${control.minimum}"></label><label>Maximum<input data-control-field="maximum" type="number" min="0" max="127" required value="${control.maximum}"></label>${encoder ? '<label>Movement<select aria-label="Encoder movement" disabled><option>Absolute · stop at endpoints</option></select></label>' : `<label class="checkbox"><input data-control-field="inverted" type="checkbox" ${control.inverted ? 'checked' : ''}>Invert fader direction</label>`}</div>
-      <p class="note">${encoder ? 'Clockwise increases the value; counterclockwise decreases it. Relative, wrap and acceleration modes are reserved for a later firmware version.' : 'Calibration sets the physical endpoints. This range sets the MIDI values sent at those endpoints.'}</p>
-    </section><div id="form-error" role="alert"></div>${formActions('Save CC configuration')}</form>`;
+  const tabs = CONTROL_NAMES;
+
+  return `
+    ${heading(
+      '03 / CC CONFIGURATION',
+      'Every move, assigned.',
+      'Set each control’s MIDI channel, CC number and output range. Save all four assignments together.'
+    )}
+
+    <div class="control-tabs" role="tablist" aria-label="Control">
+      ${tabs.map((label, i) => `
+        <button
+          id="tab-${i}"
+          role="tab"
+          tabindex="${selectedControl === i ? 0 : -1}"
+          aria-selected="${selectedControl === i}"
+          aria-controls="control-panel"
+          data-control="${i}"
+        >
+          ${label}
+        </button>
+      `).join('')}
+    </div>
+
+    <form id="controls-form">
+      <section
+        class="panel"
+        id="control-panel"
+        role="tabpanel"
+        aria-labelledby="tab-${selectedControl}"
+      >
+        <div class="control-head">
+          <h2>${CONTROL_NAMES[selectedControl]}</h2>
+          <span class="tag">MIDI 1.0 / CONTROL CHANGE</span>
+        </div>
+
+        <div class="fields control-midi-fields">
+          <label>
+            MIDI channel
+            <input
+              data-control-field="channel"
+              type="number"
+              min="1"
+              max="16"
+              required
+              value="${control.channel}"
+            >
+          </label>
+          <label>
+            CC number
+            <input
+              data-control-field="cc"
+              type="number"
+              min="0"
+              max="127"
+              required
+              value="${control.cc}"
+            >
+          </label>
+        </div>
+
+        <div class="subheading">OUTPUT RANGE</div>
+        <div class="fields range-fields">
+          <label>
+            Minimum
+            <input
+              data-control-field="minimum"
+              type="number"
+              min="0"
+              max="127"
+              required
+              value="${control.minimum}"
+            >
+          </label>
+          <label>
+            Maximum
+            <input
+              data-control-field="maximum"
+              type="number"
+              min="0"
+              max="127"
+              required
+              value="${control.maximum}"
+            >
+          </label>
+          ${!encoder ? `
+            <label class="checkbox">
+              <input
+                data-control-field="inverted"
+                type="checkbox"
+                ${control.inverted ? 'checked' : ''}
+              >
+              Invert fader direction
+            </label>
+          ` : ''}
+        </div>
+
+        <p class="note">
+          ${encoder ? `
+            Turn clockwise to increase the value and counterclockwise to decrease it.
+            The value stops at your minimum and maximum settings.
+          ` : `
+            Calibration sets the physical endpoints. This range sets the MIDI values
+            sent at those endpoints.
+          `}
+        </p>
+      </section>
+
+      <div id="form-error" role="alert"></div>
+      ${formActions('Save CC configuration')}
+    </form>
+  `;
 }
+
 function calibrationPage() {
   const endpoint = config.calibration[selectedFader];
   const step = calibration?.step ?? 0;
   return `${heading('02 / CALIBRATION', 'Full travel. Matched range.', 'Teach the controller where each fader starts and ends. Calibration is optional and can be repeated anytime.')}
     <div class="control-tabs" aria-label="Select fader">${config.faders.map((f,i) => `<button data-fader="${i}" aria-pressed="${selectedFader === i}">Fader ${i+1}</button>`).join('')}</div>
-    <section class="panel"><div class="control-head"><h2>${esc(config.faders[selectedFader].label)}</h2><span class="tag">${endpoint.calibrated ? 'CALIBRATED IN PREVIEW' : 'DEFAULT RANGE'}</span></div>
+    <section class="panel"><div class="control-head"><h2>${CONTROL_NAMES[selectedFader]}</h2><span class="tag">${endpoint.calibrated ? 'CALIBRATED IN PREVIEW' : 'DEFAULT RANGE'}</span></div>
       ${!calibration ? `<p>Move this fader to both physical stops and capture each endpoint. Other faders and your CC assignments stay unchanged.</p><div class="endpoint-values"><div><span class="metric-label">BOTTOM / RAW ADC</span><span>${endpoint.minimum}</span></div><div><span class="metric-label">TOP / RAW ADC</span><span>${endpoint.maximum}</span></div></div><p class="note">This preview uses a simulated ADC slider. The device version will read the actual fader.</p><div class="actions"><button class="primary" data-action="start-calibration">Calibrate this fader →</button></div>` : `
       <div class="stepper">${['Bottom', 'Top', 'Review'].map((title,i) => `<span class="step ${step === i ? 'active' : ''}" ${step === i ? 'aria-current="step"' : ''}><b>${i+1}</b>${title}</span>`).join('')}</div>
       <div class="cal-layout"><div class="fader-visual" aria-hidden="true"><div class="fader-track"><div class="fader-cap" style="bottom:${(calibration.raw / 4095) * 82}%"></div></div></div><div><h2>${['Move fully down.', 'Move fully up.', 'Ready to save.'][step]}</h2><p>${['Hold the fader still at its bottom stop, then capture the reading.', 'Hold the fader still at its top stop, then capture the reading.', 'These endpoints will map to the full configured MIDI range.'][step]}</p>${step < 2 ? `<div class="simulation"><label>SIMULATED RAW ADC <output id="adc-value">${calibration.raw}</output><input id="adc-slider" type="range" min="0" max="4095" value="${calibration.raw}" aria-label="Simulated fader ADC value"></label><small>Move this slider to try valid or invalid captures.</small></div>` : `<div class="endpoint-values"><div><span class="metric-label">BOTTOM</span><span>${calibration.bottom}</span></div><div><span class="metric-label">TOP</span><span>${calibration.top}</span></div></div>`}</div></div>
@@ -99,7 +424,41 @@ function optionsPage() {
 function render(focus = true) {
   document.querySelector('#session-state').textContent = finished ? '○ SETUP CLOSED' : '● SETUP ACTIVE';
   app.innerHTML = `<main>${finished ? '<div class="empty"><div class="icon" aria-hidden="true">✓</div><div class="eyebrow">PREVIEW SESSION COMPLETE</div><h1 tabindex="-1">Back to making music.</h1><p>On the controller, finishing setup stops the web server and turns Wi-Fi off. Your saved settings stay in place.</p><button class="primary" data-action="reopen">Reopen setup preview</button></div>' : ({home:homePage, network:networkPage, controls:controlPage, calibration:calibrationPage, options:optionsPage}[page] || homePage)()}</main>`;
-  if (focus) app.querySelector('h1')?.focus({preventScroll:true});
+  if (page === 'network' && networkMode === 'lan' && !finished) {
+    updateNetworkList();
+    if (networkScan.state === 'idle') void refreshNetworks();
+  }
+  if (focus) {
+    app.querySelector('h1')?.focus({preventScroll: true});
+    window.scrollTo(0, 0);
+  }
+}
+function updateNetworkList() {
+  const select = document.querySelector('#network-list');
+  if (!select) return;
+  const selected = draft.wifiSsid;
+  select.replaceChildren(new Option(networkScan.state === 'loading' ? 'Scanning…' : 'Select a network', ''));
+  for (const network of networkScan.networks) {
+    const strength = network.rssi >= -60 ? 'strong' : network.rssi >= -75 ? 'fair' : 'weak';
+    select.add(new Option(`${network.ssid} (${strength}${network.secure ? '' : ', open'})`, network.ssid));
+  }
+  select.value = selected;
+  const loading = networkScan.state === 'loading';
+  select.disabled = loading;
+  const refresh = document.querySelector('[data-action="refresh-networks"]');
+  refresh.disabled = loading; refresh.textContent = loading ? 'Scanning…' : 'Refresh';
+  const status = document.querySelector('#scan-status');
+  status.textContent = loading ? 'Scanning for networks…' : networkScan.error || (networkScan.state === 'complete' && !networkScan.networks.length ? 'No visible networks found. Try Refresh.' : '');
+}
+async function refreshNetworks() {
+  if (networkScan.state === 'loading') return;
+  networkScan.state = 'loading'; networkScan.error = ''; updateNetworkList();
+  try {
+    networkScan.networks = await scanNearbyNetworks(); networkScan.state = 'complete';
+  } catch (error) {
+    networkScan.state = 'error'; networkScan.error = error.message;
+  }
+  updateNetworkList();
 }
 function showError(error) {
   const target = document.querySelector('#form-error');
@@ -118,8 +477,6 @@ app.addEventListener('input', event => {
     control[input.dataset.controlField] = input.type === 'checkbox' ? input.checked : input.type === 'number' ? (input.value === '' ? NaN : Number(input.value)) : input.value;
   }
   if (page === 'network') {
-    if (input.name === 'deviceName') draft.deviceName = input.value;
-    if (input.name === 'hostname') draft.hostname = input.value;
     if (input.name === 'ssid') draft.wifiSsid = input.value;
   }
   if (input.id === 'brightness') {
@@ -140,9 +497,43 @@ app.addEventListener('submit', async event => {
   const submit = event.submitter; if (submit) submit.disabled = true;
   try {
     if (event.target.id === 'network-form') {
+      if (networkMode === 'lan') {
+        const selected = document.querySelector('#network-list');
+        if (networkScan.state === 'loading' || !selected?.value) throw new Error('Select a visible Wi-Fi network first.');
+        draft.wifiSsid = selected.value;
+      }
       draft.networkMode = networkMode;
       draft.networkSetupComplete = true;
-      await save(draft, networkMode === 'lan' ? 'LAN preference saved in preview. No real connection was made.' : 'Standalone preference saved in preview.');
+      const controls = [...event.target.querySelectorAll('input, select, button')];
+      const previousDisabled = controls.map(input => input.disabled);
+      const password = event.target.elements.password?.value || '';
+      controls.forEach(input => { input.disabled = true; });
+      try {
+        const saved = await device.saveNetwork(draft, password, status => {
+          document.querySelector('#connection-status').textContent = status.state === 'connecting' ? 'Connecting… Keep this page open (up to 20 seconds).' : status.error || '';
+        });
+        config = saved;
+        draft = clone(saved);
+        const status = device.networkStatus;
+        if (networkMode === 'lan' && status.viaAp) {
+          networkHandoff = status;
+          page = 'network';
+          render();
+          // Render the destination before asking the AP to shut down.
+          await new Promise(resolve => requestAnimationFrame(resolve));
+          try {
+            await device.finishNetworkHandoff();
+          } catch {
+            // The firmware also closes the AP after a bounded handoff timeout.
+          }
+        } else {
+          page = 'home';
+          render();
+          toast(networkMode === 'lan'
+            ? 'Connected. Network settings saved on the controller.'
+            : 'Standalone preference saved on the controller.');
+        }
+      } finally { controls.forEach((input,i) => { if (input.isConnected) input.disabled = previousDisabled[i]; }); }
     } else if (event.target.id === 'controls-form') await save(draft, 'CC configuration saved in this browser.');
     else if (event.target.id === 'options-form') await save(draft, 'Brightness saved in this browser.');
   } catch (error) { showError(error); }
@@ -177,6 +568,7 @@ async function handleClick(event) {
     return;
   }
   switch (target.dataset.action) {
+    case 'refresh-networks': await refreshNetworks(); break;
     case 'cancel':
       if (!config.networkSetupComplete) {
         if (dirty() && !await confirmAction('Discard unsaved changes?', 'Return to the initial network choice.', 'Discard changes')) return;
@@ -224,6 +616,18 @@ window.addEventListener('beforeunload', event => { if (dirty()) { event.preventD
 try {
   config = await device.load(); draft = clone(config); networkMode = config.networkMode;
   page = config.networkSetupComplete ? 'home' : 'network'; render(false);
+  if (device.networkLive && device.networkStatus.state === 'connecting') {
+    void (async () => {
+      while (device.networkStatus.state === 'connecting') {
+        await new Promise(resolve => setTimeout(resolve,1000));
+        if (busy) continue;
+        try {
+          await device.refreshNetwork();
+          if (page === 'home' && !busy && !finished) render(false);
+        } catch { break; }
+      }
+    })();
+  }
   if (device.warning) toast(device.warning);
 } catch (error) {
   app.innerHTML = '<main><div class="eyebrow">PREVIEW UNAVAILABLE</div><h1>Could not open setup.</h1><p id="startup-error"></p></main>';

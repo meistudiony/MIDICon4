@@ -66,9 +66,49 @@ calibration, CC configuration, brightness and device identity.
 Both resets save their replacement configuration before requesting reboot. On a
 storage error, show failure and keep current settings; do not report success/reboot.
 After successful reset, the next Wi-Fi Setup selection starts AP access and offers
-the standalone/LAN choice. Reboot itself returns to normal MIDI mode with Wi-Fi off.
+the standalone/LAN choice. After reset clears the saved network configuration, reboot leaves Wi-Fi off.
+With a valid saved configuration, reboot automatically starts saved network setup.
 
 ConfigManager implements the shared confirmed-reset operation against an abstract
 storage adapter. No actual NVS writes, menu actions or reboot calls are wired yet.
 The NVS adapter must replace the full known configuration and remove any legacy
 credential keys so factory reset cannot reload stale settings.
+
+## Fixed unit identity
+
+This unit is serial 001 and identifies as MIDICon4-001. The serial is assigned
+in hardware/DeviceIdentity.h at build time and is not a user setting. The network
+API ignores browser-supplied device names and overrides legacy stored names with
+the fixed identity. The device name is displayed as text, with no editable field.
+Network preference changes and resets do not change the unit identity. The AP SSID remains unchanged.
+
+Setup hostnames are derived from the connection state, not editable by users:
+standalone/fallback uses midicon4.local; connected LAN uses midicon4-001.local.
+Successful LAN connection turns off the setup AP. Network failure restores the
+AP and generic hostname.
+The interface displays the appropriate address instead of a hostname input.
+
+## Control names and encoder behavior
+
+Control names are fixed: Fader 1, Fader 2, Fader 3 and Encoder. There are no
+editable label fields. Older browser saves have their names normalized while
+retaining CC assignments, ranges and calibration. Fader OLEDs show CC number
+and current value. The encoder remains an assignable MIDI control during normal
+operation; a long press enters menu mode. Its CC/range settings remain available.
+
+## Automatic startup with saved networking
+
+A completed, valid saved network choice starts setup automatically at boot.
+Standalone starts the AP; LAN attempts saved credentials with AP recovery during
+the attempt. On LAN success the AP turns off; on failure it remains available. No saved choice, invalid storage or a reset leaves startup
+Wi-Fi off until setup is requested. Serial x still stops setup for the current
+session and does not erase the saved preference.
+
+## Planned AP policy once the encoder hardware is available
+
+The latest agreed target is automatic connection to saved LAN Wi-Fi, with the
+setup AP activated only by an explicit encoder-menu action. Missing credentials
+or a failed LAN attempt must not automatically enable the AP in that version.
+This is intentionally deferred until the encoder hardware/menu is implemented.
+Current bring-up firmware still starts AP recovery while connecting, turns it off
+after successful LAN connection, and restores it on LAN failure.

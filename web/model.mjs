@@ -1,12 +1,34 @@
+export const CONTROL_NAMES = Object.freeze([
+  'Fader 1',
+  'Fader 2',
+  'Fader 3',
+  'Encoder'
+]);
+
+// Keep legacy saved assignments, replacing only their old editable names.
+export function applyFixedControlNames(config) {
+  if (Array.isArray(config.faders)) {
+    config.faders.forEach((fader, index) => {
+      if (fader && index < 3) {
+        fader.label = CONTROL_NAMES[index];
+      }
+    });
+  }
+  if (config.encoder) {
+    config.encoder.label = CONTROL_NAMES[3];
+  }
+  return config;
+}
+
 export const copyConfiguration = value => JSON.parse(JSON.stringify(value));
 export const SCHEMA_VERSION = 2;
 export function defaults() {
   return {
-    version: SCHEMA_VERSION, deviceName: 'MIDICon4', hostname: 'midi-control',
+    version: SCHEMA_VERSION, deviceName: 'MIDICon4-001', hostname: 'midicon4',
     networkMode: 'standalone', networkSetupComplete: false, wifiSsid: '',
     screenBrightness: 128,
-    faders: [0, 1, 2].map(i => ({label: `FADER ${i + 1}`, channel: 1, cc: 21 + i, minimum: 0, maximum: 127, inverted: false})),
-    encoder: {label: 'ENCODER', channel: 1, cc: 24, minimum: 0, maximum: 127, mode: 'absolute', acceleration: false},
+    faders: [0, 1, 2].map(i => ({label: CONTROL_NAMES[i], channel: 1, cc: 21 + i, minimum: 0, maximum: 127, inverted: false})),
+    encoder: {label: CONTROL_NAMES[3], channel: 1, cc: 24, minimum: 0, maximum: 127, mode: 'absolute', acceleration: false},
     calibration: [0, 1, 2].map(() => ({minimum: 0, maximum: 4095, calibrated: false}))
   };
 }

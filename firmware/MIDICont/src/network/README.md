@@ -1,2 +1,3 @@
-NetworkManager starts/stops a password-protected AP on explicit serial commands.
-LAN provisioning and persistent network preferences remain pending; see docs/ap-bringup.md.
+NetworkManager auto-starts saved network setup at boot and retains serial w/x control.
+NetworkConnection implements actual LAN attempts, AP recovery and versioned NVS
+network settings. See docs/ap-bringup.md.

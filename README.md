@@ -7,7 +7,7 @@ three faders, one encoder, four OLEDs, and optional browser configuration.
 
 Phase 1 USB serial heartbeat, Phase 2 ADC diagnostics, and an optional
 serial-triggered AP/web preview. No MIDI USB interface, displays, encoder decoding,
-persistent device configuration, or LAN provisioning yet.
+persistent CC/calibration configuration yet. Network setup and NVS network storage are implemented.
 All pins start unassigned; booting the skeleton does not read floating inputs.
 
 ## Build and bring-up

@@ -12,6 +12,7 @@ constexpr int I2cScl = Unassigned;
 constexpr uint32_t SampleIntervalMs = 5;
 constexpr uint32_t ReportIntervalMs = 100;
 constexpr uint32_t HeartbeatIntervalMs = 2000;
+constexpr int16_t MinimumNetworkRssiDbm = -80;
 constexpr uint8_t AdcBits = 12;
 constexpr uint16_t AdcMaximum = 4095;
 } }

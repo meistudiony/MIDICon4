@@ -30,7 +30,11 @@ class Application {
     network_.tick();
     const uint32_t now = millis();
     if (!announced_ && Serial) {
-      Serial.println("MIDICont bring-up: Wi-Fi off at boot; unassigned inputs skipped.");
+      Serial.println(
+        "MIDICont bring-up: saved network settings auto-start setup; "
+        "unassigned inputs skipped."
+      );
+      network_.printStatus();
       Serial.println("Commands: w=start AP setup, x=stop setup, s=network status");
       Serial.println("fader,raw,filtered,normalized,cc_value");
       announced_ = true;
